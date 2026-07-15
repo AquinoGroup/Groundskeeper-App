@@ -292,13 +292,7 @@ const DAYS = ["monday","tuesday","wednesday","thursday","friday"];
 const DAY_LABEL = {monday:"Mon",tuesday:"Tue",wednesday:"Wed",thursday:"Thu",friday:"Fri"};
 const DAY_FULL = {monday:"Monday",tuesday:"Tuesday",wednesday:"Wednesday",thursday:"Thursday",friday:"Friday"};
 
-let state = {
-  mode: "admin",
-  activeDay: DAYS[Math.min(Math.max(new Date().getDay()-1,0),4)],
-  data: { schedule: {monday:[],tuesday:[],wednesday:[],thursday:[],friday:[]}, priorityTasks: [] },
-  openForm: null,
-  currentUser: null,
-};
+const ADMIN_EMAIL = "anthony@theaquinogroup.com"; function isAdminUser(){ return !!(state.currentUser && state.currentUser.email && state.currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()); } function currentWeekId(){ const d = new Date(); const day = d.getDay(); const diff = (day === 0 ? -6 : 1 - day); d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); } let state = { mode: "worker", activeDay: DAYS[Math.min(Math.max(new Date().getDay()-1,0),4)], data: { schedule: {monday:[],tuesday:[],wednesday:[],thursday:[],friday:[]}, priorityTasks: [], weekId: currentWeekId() }, openForm: null, currentUser: null, };
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
@@ -397,7 +391,7 @@ function fmtTime(t){
 }
 
 /* ---------------- actions ---------------- */
-function setMode(m){ state.mode = m; state.openForm=null; render(); }
+function setMode(m){ if(!isAdminUser()) return; /* workers locked to worker mode */ state.mode = m; state.openForm=null; render(); }
 function setActiveDay(d){ state.activeDay = d; state.openForm=null; render(); }
 
 function toggleScheduleDone(day, id){
