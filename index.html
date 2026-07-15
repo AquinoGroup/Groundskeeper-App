@@ -6,6 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- ============================================================ -->
+<!-- FIREBASE SDKS (do not remove) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- ============================================================ -->
+
 <style>
   :root{
     --pine:#1F3A2E;
@@ -36,6 +44,36 @@
   }
   .wrap{max-width:920px;margin:0 auto;padding:28px 20px 60px;}
 
+  /* LOGIN */
+  .login-wrap{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:20px;
+  }
+  .login-card{
+    background:var(--card);border:2px solid var(--pine);border-radius:10px;
+    padding:32px 28px;max-width:360px;width:100%;
+  }
+  .login-card .eyebrow{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--soil);font-weight:700;
+  }
+  .login-card h1{
+    font-family:var(--font-display);font-size:28px;font-weight:700;
+    margin:2px 0 20px;color:var(--pine-dark);text-transform:uppercase;
+  }
+  .login-card label{display:block;margin-bottom:4px;}
+  .login-card input{width:100%;margin-bottom:14px;}
+  .login-error{
+    font-family:var(--font-mono);font-size:12px;color:#B3391A;margin-bottom:10px;min-height:16px;
+  }
+  .login-btn{
+    width:100%;font-family:var(--font-mono);font-weight:700;font-size:13px;letter-spacing:.05em;
+    text-transform:uppercase;background:var(--pine);color:var(--canvas);
+    border:none;border-radius:6px;padding:12px;cursor:pointer;
+  }
+  .login-btn:hover{background:var(--pine-dark);}
+  .login-btn:disabled{opacity:.6;cursor:default;}
+
   /* HEADER */
   header{
     display:flex;justify-content:space-between;align-items:flex-end;
@@ -55,6 +93,7 @@
     font-size:34px;font-weight:700;letter-spacing:.01em;
     margin:0;color:var(--pine-dark);text-transform:uppercase;
   }
+  .header-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .mode-toggle{
     display:flex;background:var(--card);border:2px solid var(--pine);
     border-radius:999px;padding:3px;gap:2px;
@@ -67,11 +106,21 @@
     transition:background .15s ease, color .15s ease;
   }
   .mode-toggle button.active{background:var(--pine);color:var(--canvas);}
+  .logout-btn{
+    font-family:var(--font-mono);font-size:11px;font-weight:700;text-transform:uppercase;
+    background:transparent;border:1.5px solid var(--line);color:var(--ink-soft);
+    border-radius:6px;padding:8px 12px;cursor:pointer;
+  }
+  .logout-btn:hover{border-color:var(--soil);color:var(--soil);}
 
   /* WEEK STATUS BAR */
   .weekbar{
     font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);
-    display:flex;justify-content:space-between;margin-bottom:20px;
+    display:flex;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:6px;
+  }
+  .sync-dot{
+    display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sage);
+    margin-right:5px;vertical-align:middle;
   }
 
   section.block{margin-bottom:34px;}
@@ -131,7 +180,7 @@
   }
 
   /* DAY TABS */
-  .day-tabs{display:flex;gap:4px;margin-bottom:0;}
+  .day-tabs{display:flex;gap:4px;margin-bottom:0;flex-wrap:wrap;}
   .day-tab{
     font-family:var(--font-display);font-size:14px;letter-spacing:.04em;
     text-transform:uppercase;font-weight:600;
@@ -203,68 +252,119 @@
 </style>
 </head>
 <body>
-<div class="wrap" id="app">
-  <div class="loading">Loading schedule…</div>
+<div id="app">
+  <div class="loading">Loading…</div>
 </div>
 
 <script>
+/* =========================================================================
+   FIREBASE CONFIG — replace the values below with your own project's config.
+   Firebase Console > Project Settings > General > Your apps > Web app (</>) 
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId: "PASTE_YOUR_PROJECT_ID",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId: "PASTE_YOUR_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const DATA_DOC = db.collection("groundsCrew").doc("data");
+
+/* ========================================================================= */
+
 const DAYS = ["monday","tuesday","wednesday","thursday","friday"];
 const DAY_LABEL = {monday:"Mon",tuesday:"Tue",wednesday:"Wed",thursday:"Thu",friday:"Fri"};
 const DAY_FULL = {monday:"Monday",tuesday:"Tuesday",wednesday:"Wednesday",thursday:"Thursday",friday:"Friday"};
-const STORAGE_KEY = "grounds-crew-data";
 
 let state = {
-  mode: "admin", // admin | worker
-  activeDay: DAYS[new Date().getDay()>=1 && new Date().getDay()<=5 ? DAYS[new Date().getDay()-1] ? new Date().getDay()-1 : 0 : 0],
+  mode: "admin",
+  activeDay: DAYS[Math.min(Math.max(new Date().getDay()-1,0),4)],
   data: { schedule: {monday:[],tuesday:[],wednesday:[],thursday:[],friday:[]}, priorityTasks: [] },
-  openForm: null, // {type:'schedule'|'priority', editId: id|null}
+  openForm: null,
+  currentUser: null,
 };
-state.activeDay = DAYS[Math.min(Math.max(new Date().getDay()-1,0),4)];
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
-function loadData(){
-  try{
-    const savedData = localStorage.getItem(STORAGE_KEY);
-
-    if(savedData){
-      const parsed = JSON.parse(savedData);
-
-      state.data = Object.assign(
-        {
-          schedule: {
-            monday: [],
-            tuesday: [],
-            wednesday: [],
-            thursday: [],
-            friday: []
-          },
-          priorityTasks: []
-        },
-        parsed
-      );
-
-      DAYS.forEach(day => {
-        if(!state.data.schedule[day]){
-          state.data.schedule[day] = [];
-        }
-      });
-    }
-  }catch(error){
-    console.log("No existing data yet, starting fresh.", error);
+/* ---------------- AUTH ---------------- */
+auth.onAuthStateChanged(function(user){
+  state.currentUser = user;
+  if(user){
+    attachDataListener();
+    render();
+  } else {
+    detachDataListener();
+    renderLogin();
   }
+});
 
-  render();
+let unsubscribe = null;
+function attachDataListener(){
+  if(unsubscribe) return;
+  unsubscribe = DATA_DOC.onSnapshot(function(doc){
+    if(doc.exists){
+      const d = doc.data();
+      state.data = Object.assign(
+        {schedule:{monday:[],tuesday:[],wednesday:[],thursday:[],friday:[]}, priorityTasks:[]},
+        d
+      );
+      DAYS.forEach(function(day){ if(!state.data.schedule[day]) state.data.schedule[day]=[]; });
+    }
+    render();
+  }, function(err){
+    console.error("Sync error:", err);
+  });
+}
+function detachDataListener(){
+  if(unsubscribe){ unsubscribe(); unsubscribe = null; }
 }
 
 function saveData(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
-  }catch(error){
-    console.error("Save failed", error);
-  }
+  DATA_DOC.set(state.data).catch(function(e){ console.error("Save failed", e); });
 }
 
+function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(function(e){
+      err.textContent = 'Could not log in — check your email and password.';
+    })
+    .finally(function(){
+      btn.disabled = false; btn.textContent = 'Log in';
+    });
+}
+function doLogout(){ auth.signOut(); }
+
+function renderLogin(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-card">
+        <span class="eyebrow">Grounds Crew · Work Order</span>
+        <h1>Sign in</h1>
+        <label>Email</label>
+        <input id="login-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter') doLogin()">
+        <label>Password</label>
+        <input id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()">
+        <div class="login-error" id="login-error"></div>
+        <button class="login-btn" id="login-btn" onclick="doLogin()">Log in</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('login-email').focus();
+}
+
+/* ---------------- helpers ---------------- */
 function fmtDate(iso){
   if(!iso) return "";
   const d = new Date(iso+"T00:00:00");
@@ -278,41 +378,44 @@ function isOverdue(iso){
 }
 function fmtTime(t){
   if(!t) return "";
-  const [h,m] = t.split(":").map(Number);
+  const parts = t.split(":").map(Number);
+  const h = parts[0], m = parts[1];
   const ampm = h>=12 ? "PM":"AM";
   const h12 = h%12===0?12:h%12;
-  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  return h12+":"+String(m).padStart(2,'0')+" "+ampm;
 }
 
-// ---------- ACTIONS ----------
+/* ---------------- actions ---------------- */
 function setMode(m){ state.mode = m; state.openForm=null; render(); }
 function setActiveDay(d){ state.activeDay = d; state.openForm=null; render(); }
 
 function toggleScheduleDone(day, id){
-  const item = state.data.schedule[day].find(i=>i.id===id);
-  if(item){ item.done = !item.done; saveData(); render(); }
+  const item = state.data.schedule[day].find(function(i){return i.id===id;});
+  if(item){ item.done = !item.done; saveData(); }
 }
 function togglePriorityDone(id){
-  const t = state.data.priorityTasks.find(t=>t.id===id);
-  if(t){ t.done = !t.done; saveData(); render(); }
+  const t = state.data.priorityTasks.find(function(t){return t.id===id;});
+  if(t){ t.done = !t.done; saveData(); }
 }
 function deleteScheduleItem(day,id){
-  state.data.schedule[day] = state.data.schedule[day].filter(i=>i.id!==id);
-  saveData(); render();
+  state.data.schedule[day] = state.data.schedule[day].filter(function(i){return i.id!==id;});
+  saveData();
 }
 function deletePriorityTask(id){
-  state.data.priorityTasks = state.data.priorityTasks.filter(t=>t.id!==id);
-  saveData(); render();
+  state.data.priorityTasks = state.data.priorityTasks.filter(function(t){return t.id!==id;});
+  saveData();
 }
 function openScheduleForm(day, editId){
-  state.openForm = {type:'schedule', day, editId: editId||null};
+  state.openForm = {type:'schedule', day:day, editId: editId||null};
   render();
-  document.getElementById('form-anchor')?.scrollIntoView({behavior:'smooth', block:'center'});
+  const el = document.getElementById('form-anchor');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
 }
 function openPriorityForm(editId){
   state.openForm = {type:'priority', editId: editId||null};
   render();
-  document.getElementById('form-anchor')?.scrollIntoView({behavior:'smooth', block:'center'});
+  const el = document.getElementById('form-anchor');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
 }
 function closeForm(){ state.openForm=null; render(); }
 
@@ -323,12 +426,12 @@ function submitScheduleForm(day, editId){
   const notes = document.getElementById('f-notes').value.trim();
   if(!task){ alert('Please enter a task.'); return; }
   if(editId){
-    const item = state.data.schedule[day].find(i=>i.id===editId);
-    Object.assign(item, {time, task, location, notes});
+    const item = state.data.schedule[day].find(function(i){return i.id===editId;});
+    Object.assign(item, {time:time, task:task, location:location, notes:notes});
   } else {
-    state.data.schedule[day].push({id:uid(), time, task, location, notes, done:false});
+    state.data.schedule[day].push({id:uid(), time:time, task:task, location:location, notes:notes, done:false});
   }
-  state.data.schedule[day].sort((a,b)=> (a.time||"99:99").localeCompare(b.time||"99:99"));
+  state.data.schedule[day].sort(function(a,b){ return (a.time||"99:99").localeCompare(b.time||"99:99"); });
   state.openForm=null;
   saveData(); render();
 }
@@ -339,41 +442,47 @@ function submitPriorityForm(editId){
   const notes = document.getElementById('f-pnotes').value.trim();
   if(!task){ alert('Please enter a task.'); return; }
   if(editId){
-    const t = state.data.priorityTasks.find(t=>t.id===editId);
-    Object.assign(t, {task, dueDate, location, notes});
+    const t = state.data.priorityTasks.find(function(t){return t.id===editId;});
+    Object.assign(t, {task:task, dueDate:dueDate, location:location, notes:notes});
   } else {
-    state.data.priorityTasks.push({id:uid(), task, dueDate, location, notes, done:false});
+    state.data.priorityTasks.push({id:uid(), task:task, dueDate:dueDate, location:location, notes:notes, done:false});
   }
-  state.data.priorityTasks.sort((a,b)=> (a.dueDate||"9999").localeCompare(b.dueDate||"9999"));
+  state.data.priorityTasks.sort(function(a,b){ return (a.dueDate||"9999").localeCompare(b.dueDate||"9999"); });
   state.openForm=null;
   saveData(); render();
 }
 
-// ---------- RENDER ----------
+/* ---------------- render ---------------- */
 function render(){
   const app = document.getElementById('app');
   const isAdmin = state.mode === 'admin';
 
   const priorityHtml = renderPriorityBlock(isAdmin);
   const scheduleHtml = renderScheduleBlock(isAdmin);
+  const userEmail = state.currentUser ? state.currentUser.email : '';
 
   app.innerHTML = `
-    <header>
-      <div class="brand">
-        <span class="eyebrow">Grounds Crew · Work Order</span>
-        <h1>Weekly Schedule</h1>
+    <div class="wrap">
+      <header>
+        <div class="brand">
+          <span class="eyebrow">Grounds Crew · Work Order</span>
+          <h1>Weekly Schedule</h1>
+        </div>
+        <div class="header-controls">
+          <div class="mode-toggle">
+            <button class="${isAdmin?'active':''}" onclick="setMode('admin')">Admin</button>
+            <button class="${!isAdmin?'active':''}" onclick="setMode('worker')">Worker</button>
+          </div>
+          <button class="logout-btn" onclick="doLogout()">Log out (${escapeHtml(userEmail)})</button>
+        </div>
+      </header>
+      <div class="weekbar">
+        <span><span class="sync-dot"></span>${isAdmin ? 'Editing schedule — changes save instantly and sync to the worker view.' : 'Read-only view — check items off as you complete them.'}</span>
       </div>
-      <div class="mode-toggle">
-        <button class="${isAdmin?'active':''}" onclick="setMode('admin')">Admin</button>
-        <button class="${!isAdmin?'active':''}" onclick="setMode('worker')">Worker</button>
-      </div>
-    </header>
-    <div class="weekbar">
-      <span>${isAdmin ? 'Editing schedule — changes save automatically and sync to the worker view.' : 'Read-only view — check items off as you complete them.'}</span>
+      ${priorityHtml}
+      ${scheduleHtml}
+      <div class="footer-note">Grounds Crew Schedule App · synced live between Admin and Worker</div>
     </div>
-    ${priorityHtml}
-    ${scheduleHtml}
-    <div class="footer-note">Grounds Crew Schedule App · data is shared between Admin and Worker modes</div>
   `;
 }
 
@@ -386,7 +495,7 @@ function renderPriorityBlock(isAdmin){
   if(tasks.length===0){
     list = `<div class="empty-msg">No high-priority tasks right now.</div>`;
   } else {
-    list = `<div class="priority-grid">` + tasks.map(t=>{
+    list = `<div class="priority-grid">` + tasks.map(function(t){
       const overdue = !t.done && isOverdue(t.dueDate);
       return `
       <div class="stamp-card ${t.done?'done':''}">
@@ -418,7 +527,7 @@ function renderPriorityBlock(isAdmin){
 }
 
 function renderPriorityForm(editId){
-  const t = editId ? state.data.priorityTasks.find(x=>x.id===editId) : null;
+  const t = editId ? state.data.priorityTasks.find(function(x){return x.id===editId;}) : null;
   return `
     <div class="form-card" id="form-anchor">
       <div class="form-row">
@@ -450,7 +559,7 @@ function renderPriorityForm(editId){
 }
 
 function renderScheduleBlock(isAdmin){
-  const tabs = DAYS.map(d=>{
+  const tabs = DAYS.map(function(d){
     const count = state.data.schedule[d].length;
     return `<div class="day-tab ${state.activeDay===d?'active':''}" onclick="setActiveDay('${d}')">${DAY_LABEL[d]}<span class="cnt">(${count})</span></div>`;
   }).join('');
@@ -464,7 +573,7 @@ function renderScheduleBlock(isAdmin){
   if(items.length===0){
     list = `<div class="empty-msg">Nothing scheduled for ${DAY_FULL[day]} yet.</div>`;
   } else {
-    list = items.map(i=>`
+    list = items.map(function(i){ return `
       <div class="sched-item ${i.done?'done':''}">
         <div class="check ${i.done?'checked':''}" onclick="toggleScheduleDone('${day}','${i.id}')" title="Mark ${i.done?'incomplete':'complete'}"></div>
         <div class="s-time">${fmtTime(i.time)}</div>
@@ -479,7 +588,7 @@ function renderScheduleBlock(isAdmin){
           <div class="icon-btn del" onclick="if(confirm('Delete this task?')) deleteScheduleItem('${day}','${i.id}')" title="Delete">✕</div>
         </div>` : ''}
       </div>
-    `).join('');
+    `; }).join('');
   }
 
   return `
@@ -496,7 +605,7 @@ function renderScheduleBlock(isAdmin){
 }
 
 function renderScheduleForm(day, editId){
-  const i = editId ? state.data.schedule[day].find(x=>x.id===editId) : null;
+  const i = editId ? state.data.schedule[day].find(function(x){return x.id===editId;}) : null;
   return `
     <div class="form-card" id="form-anchor">
       <div class="form-row">
@@ -526,11 +635,11 @@ function renderScheduleForm(day, editId){
 }
 
 function escapeHtml(str){
-  return String(str||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return String(str||'').replace(/[&<>"']/g, function(m){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+  });
 }
 function escapeAttr(str){ return escapeHtml(str); }
-
-loadData();
 </script>
 </body>
 </html>
