@@ -261,14 +261,25 @@
    FIREBASE CONFIG — replace the values below with your own project's config.
    Firebase Console > Project Settings > General > Your apps > Web app (</>) 
    ========================================================================= */
-const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
-};
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyA5j1lmem4ZIEadWI-me5jAzszMTbIfUrs",
+    authDomain: "grounds-crew.firebaseapp.com",
+    projectId: "grounds-crew",
+    storageBucket: "grounds-crew.firebasestorage.app",
+    messagingSenderId: "1082893853616",
+    appId: "1:1082893853616:web:097c4f37584bdc75832c75"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
