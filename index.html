@@ -297,34 +297,7 @@ const ADMIN_EMAIL = "anthony@theaquinogroup.com"; function isAdminUser(){ return
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
 /* ---------------- AUTH ---------------- */
-auth.onAuthStateChanged(function(user){
-  state.currentUser = user;
-  if(user){
-    attachDataListener();
-    render();
-  } else {
-    detachDataListener();
-    renderLogin();
-  }
-});
-
-let unsubscribe = null;
-function attachDataListener(){
-  if(unsubscribe) return;
-  unsubscribe = DATA_DOC.onSnapshot(function(doc){
-    if(doc.exists){
-      const d = doc.data();
-      state.data = Object.assign(
-        {schedule:{monday:[],tuesday:[],wednesday:[],thursday:[],friday:[]}, priorityTasks:[]},
-        d
-      );
-      DAYS.forEach(function(day){ if(!state.data.schedule[day]) state.data.schedule[day]=[]; });
-    }
-    render();
-  }, function(err){
-    console.error("Sync error:", err);
-  });
-}
+auth.onAuthStateChanged(function(user){ state.currentUser = user; if(user){ state.mode = isAdminUser() ? "admin" : "worker"; attachDataListener(); render(); } else { detachDataListener(); renderLogin(); } }); let unsubscribe = null; let weekResetHandled = false; function attachDataListener(){ if(unsubscribe) return; unsubscribe = DATA_DOC.onSnapshot(function(doc){ if(doc.exists){ const d = doc.data(); state.data = Object.assign({schedule:{monday:[],tuesday:[],wednesday:[],thursday:[],friday:[]}, priorityTasks:[], weekId: currentWeekId()}, d); DAYS.forEach(function(day){ if(!state.data.schedule[day]) state.data.schedule[day]=[]; }); const nowWeek = currentWeekId(); if(state.data.weekId !== nowWeek && !weekResetHandled){ weekResetHandled = true; DAYS.forEach(function(day){ state.data.schedule[day].forEach(function(item){ item.done = false; }); }); state.data.weekId = nowWeek; saveData(); } } render(); }, function(err){ console.error("Sync error:", err); }); }
 function detachDataListener(){
   if(unsubscribe){ unsubscribe(); unsubscribe = null; }
 }
@@ -458,38 +431,7 @@ function submitPriorityForm(editId){
 }
 
 /* ---------------- render ---------------- */
-function render(){
-  const app = document.getElementById('app');
-  const isAdmin = state.mode === 'admin';
-
-  const priorityHtml = renderPriorityBlock(isAdmin);
-  const scheduleHtml = renderScheduleBlock(isAdmin);
-  const userEmail = state.currentUser ? state.currentUser.email : '';
-
-  app.innerHTML = `
-    <div class="wrap">
-      <header>
-        <div class="brand">
-          <span class="eyebrow">Grounds Crew · Work Order</span>
-          <h1>Weekly Schedule</h1>
-        </div>
-        <div class="header-controls">
-          <div class="mode-toggle">
-            <button class="${isAdmin?'active':''}" onclick="setMode('admin')">Admin</button>
-            <button class="${!isAdmin?'active':''}" onclick="setMode('worker')">Worker</button>
-          </div>
-          <button class="logout-btn" onclick="doLogout()">Log out (${escapeHtml(userEmail)})</button>
-        </div>
-      </header>
-      <div class="weekbar">
-        <span><span class="sync-dot"></span>${isAdmin ? 'Editing schedule — changes save instantly and sync to the worker view.' : 'Read-only view — check items off as you complete them.'}</span>
-      </div>
-      ${priorityHtml}
-      ${scheduleHtml}
-      <div class="footer-note">Grounds Crew Schedule App · synced live between Admin and Worker</div>
-    </div>
-  `;
-}
+function render(){ const app = document.getElementById('app'); const admin = isAdminUser(); const isAdmin = admin && state.mode === 'admin'; const priorityHtml = renderPriorityBlock(isAdmin); const scheduleHtml = renderScheduleBlock(isAdmin); const userEmail = state.currentUser ? state.currentUser.email : ''; const modeToggleHtml = admin ? `<div class="mode-toggle"><button class="${isAdmin?'active':''}" onclick="setMode('admin')">Admin</button><button class="${!isAdmin?'active':''}" onclick="setMode('worker')">Worker</button></div>` : ''; app.innerHTML = `<div class="wrap"><header><div class="brand"><span class="eyebrow">Grounds Crew · Work Order</span><h1>Weekly Schedule</h1></div><div class="header-controls">${modeToggleHtml}<button class="logout-btn" onclick="doLogout()">Log out (${escapeHtml(userEmail)})</button></div></header><div class="weekbar"><span><span class="sync-dot"></span>${isAdmin ? 'Editing the recurring template — changes save instantly and sync to the worker view.' : 'Check items off as you complete them. This list repeats every week.'}</span><span>Week of ${fmtDate(state.data.weekId)}</span></div>${priorityHtml}${scheduleHtml}<div class="footer-note">Grounds Crew Schedule App · synced live between Admin and Worker</div></div>`; }
 
 function renderPriorityBlock(isAdmin){
   const tasks = state.data.priorityTasks;
