@@ -183,7 +183,7 @@
     display:flex;align-items:center;justify-content:center;
   }
   .icon-btn:hover{border-color:var(--soil);color:var(--soil);}
-  .icon-btn.del:hover{border-color:#B3391A;color:#B3391A;}
+  .icon-btn.del:hover{border-color:#B3391A;color:#B3391A;} .worker-note{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);} .worker-note-label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--sage);font-weight:700;margin-bottom:4px;} .worker-note-text{font-size:13px;color:var(--ink);line-height:1.4;} .worker-note-input{width:100%;font-family:var(--font-body);font-size:13px;padding:7px 9px;border:1.5px solid var(--line);border-radius:5px;background:#fff;color:var(--ink);resize:vertical;min-height:36px;margin-bottom:6px;} .worker-note-input:focus{outline:2px solid var(--sage);outline-offset:1px;border-color:var(--sage);} .worker-note-save{font-family:var(--font-mono);font-size:11px;font-weight:700;text-transform:uppercase;background:var(--sage);color:#fff;border:none;border-radius:5px;padding:6px 12px;cursor:pointer;} .worker-note-save:hover{opacity:.9;}
 
   .empty-msg{
     font-family:var(--font-mono);font-size:13px;color:var(--ink-soft);
@@ -447,14 +447,7 @@ function renderPriorityBlock(isAdmin){
       return `
       <div class="stamp-card ${t.done?'done':''}">
         <div class="check ${t.done?'checked':''}" onclick="togglePriorityDone('${t.id}')" title="Mark ${t.done?'incomplete':'complete'}"></div>
-        <div class="p-body">
-          <div class="p-task">${escapeHtml(t.task)}</div>
-          ${t.notes ? `<div class="p-notes">${escapeHtml(t.notes)}</div>` : ''}
-          <div class="p-meta">
-            ${t.dueDate ? `<span class="due-stamp ${overdue?'overdue':''}">${overdue?'Overdue · ':'Due '}${fmtDate(t.dueDate)}</span>` : ''}
-            ${t.location ? `<span class="p-loc">📍 ${escapeHtml(t.location)}</span>` : ''}
-          </div>
-        </div>
+        <div class="p-body"><div class="p-task">${escapeHtml(t.task)}</div>${t.notes ? `<div class="p-notes">${escapeHtml(t.notes)}</div>` : ''}<div class="p-meta">${t.dueDate ? `<span class="due-stamp ${overdue?'overdue':''}">${overdue?'Overdue · ':'Due '}${fmtDate(t.dueDate)}</span>` : ''}${t.location ? `<span class="p-loc">📍 ${escapeHtml(t.location)}</span>` : ''}</div>${renderWorkerNote(t, isAdmin)}</div>
         ${isAdmin ? `
         <div class="row-actions">
           <div class="icon-btn" onclick="openPriorityForm('${t.id}')" title="Edit">✎</div>
@@ -473,7 +466,7 @@ function renderPriorityBlock(isAdmin){
   `;
 }
 
-function renderPriorityForm(editId){
+function renderWorkerNote(t, isAdmin){ if(isAdmin){ return t.workerNotes ? `<div class="worker-note"><div class="worker-note-label">Brady's note</div><div class="worker-note-text">${escapeHtml(t.workerNotes)}</div></div>` : ''; } return `<div class="worker-note"><div class="worker-note-label">Your note</div><textarea class="worker-note-input" id="wn-${t.id}" placeholder="Add a note for the owner (what you found, what's needed, etc.)">${escapeHtml(t.workerNotes||'')}</textarea><button class="worker-note-save" onclick="saveWorkerNote('${t.id}')">Save note</button></div>`; } function saveWorkerNote(id){ const el = document.getElementById('wn-'+id); if(!el) return; const t = state.data.priorityTasks.find(function(x){return x.id===id;}); if(t){ t.workerNotes = el.value.trim(); saveData(); render(); } } function renderPriorityForm(editId){
   const t = editId ? state.data.priorityTasks.find(function(x){return x.id===editId;}) : null;
   return `
     <div class="form-card" id="form-anchor">
